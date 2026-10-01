@@ -1,0 +1,15 @@
+[package]
+name = "ghostty-vt"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+serde = ["dep:serde"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
+ghostty-vt-sys = { path = "../ghostty-vt-sys" }
+
+[dev-dependencies]
+serde_json = "1"
+portable-pty = "0.8"

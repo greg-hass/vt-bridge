@@ -1,0 +1,3 @@
+[workspace]
+members = ["ghostty-vt-sys", "ghostty-vt"]
+resolver = "2"
