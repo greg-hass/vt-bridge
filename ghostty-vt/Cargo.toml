@@ -13,3 +13,7 @@ ghostty-vt-sys = { path = "../ghostty-vt-sys" }
 [dev-dependencies]
 serde_json = "1"
 portable-pty = "0.8"
+
+[[example]]
+name = "json_size"
+required-features = ["serde"]

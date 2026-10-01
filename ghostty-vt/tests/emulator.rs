@@ -127,3 +127,90 @@ fn kitty_keyboard_protocol_is_honoured() {
     let esc = t.encode_key("Escape", None, Mods::default(), KeyAction::Press);
     assert_eq!(esc, b"\x1b[27u");
 }
+
+fn click(x: f32, y: f32, action: MouseAction, button: Option<u8>) -> MouseEvent {
+    MouseEvent { action, button, mods: Mods::default(), x, y, any_button_pressed: action == MouseAction::Press }
+}
+
+#[test]
+fn mouse_is_reported_only_when_the_program_asks() {
+    let mut t = Terminal::new(80, 24).unwrap();
+    assert!(!t.mouse_tracking());
+    assert!(t.encode_mouse(click(44.0, 56.0, MouseAction::Press, Some(1)), (8, 16)).is_empty());
+    t.feed(b"\x1b[?1000h\x1b[?1006h"); // normal tracking, SGR format
+    assert!(t.mouse_tracking());
+    // Pixel (44, 56) with 8x16 cells is column 5, row 3 (zero based) -> 6;4 one based.
+    assert_eq!(t.encode_mouse(click(44.0, 56.0, MouseAction::Press, Some(1)), (8, 16)), b"\x1b[<0;6;4M");
+    assert_eq!(t.encode_mouse(click(44.0, 56.0, MouseAction::Release, Some(1)), (8, 16)), b"\x1b[<0;6;4m");
+    // Wheel up is button 4 -> code 64.
+    assert_eq!(t.encode_mouse(click(0.0, 0.0, MouseAction::Press, Some(4)), (8, 16)), b"\x1b[<64;1;1M");
+}
+
+#[test]
+fn paste_is_bracketed_on_request_and_sanitised() {
+    let mut t = Terminal::new(10, 3).unwrap();
+    assert_eq!(t.encode_paste("a\nb"), b"a\rb");
+    t.feed(b"\x1b[?2004h");
+    assert_eq!(t.encode_paste("a\nb"), b"\x1b[200~a\nb\x1b[201~");
+    assert_eq!(t.encode_paste("x\x1b[31my"), b"\x1b[200~x [31my\x1b[201~");
+}
+
+#[test]
+fn focus_reports_follow_mode_1004() {
+    let mut t = Terminal::new(10, 3).unwrap();
+    assert!(t.encode_focus(true).is_empty());
+    t.feed(b"\x1b[?1004h");
+    assert_eq!(t.encode_focus(true), b"\x1b[I");
+    assert_eq!(t.encode_focus(false), b"\x1b[O");
+}
+
+#[test]
+fn scrollback_and_scroll_offset() {
+    let mut t = Terminal::new(10, 3).unwrap();
+    for i in 0..20 {
+        t.feed(format!("line{i}\r\n").as_bytes());
+    }
+    let at_bottom = t.snapshot(false).unwrap();
+    assert!(at_bottom.scrollbar.total > 3);
+    assert_eq!(at_bottom.scrollbar.offset + at_bottom.scrollbar.len, at_bottom.scrollbar.total);
+    t.scroll(-5);
+    let up = t.snapshot(false).unwrap();
+    assert_eq!(up.scrollbar.offset, at_bottom.scrollbar.offset - 5);
+    assert_eq!(up.dirty, Dirty::Full);
+    assert!(up.rows[0].text().starts_with("line"));
+    assert_ne!(up.rows[0].text(), at_bottom.rows[0].text());
+}
+
+#[test]
+fn theme_colours_apply_to_defaults_and_palette() {
+    let mut t = Terminal::new(10, 2).unwrap();
+    let mut ansi = [Rgb(0, 0, 0); 16];
+    ansi[1] = Rgb(200, 10, 20);
+    t.set_colors(Rgb(1, 2, 3), Rgb(4, 5, 6), Rgb(7, 8, 9), &ansi);
+    t.feed(b"\x1b[31mred");
+    let s = t.snapshot(false).unwrap();
+    assert_eq!((s.fg, s.bg), (Rgb(1, 2, 3), Rgb(4, 5, 6)));
+    assert_eq!(s.cursor_color, Some(Rgb(7, 8, 9)));
+    assert_eq!(s.rows[0].runs[0].fg, Some(Rgb(200, 10, 20)));
+}
+
+#[test]
+fn alt_screen_flag() {
+    let mut t = Terminal::new(10, 2).unwrap();
+    assert!(!t.alt_screen());
+    t.feed(b"\x1b[?1049h");
+    assert!(t.alt_screen());
+}
+
+#[test]
+fn non_ascii_runs_carry_per_column_cells() {
+    let mut t = Terminal::new(10, 1).unwrap();
+    t.feed("a日b─".as_bytes());
+    let snap = t.snapshot(false).unwrap();
+    let run = &snap.rows[0].runs[0];
+    assert_eq!(run.cells.as_deref().unwrap(), ["a", "日", "", "b", "─"]);
+    assert_eq!(run.width, 5);
+    // Plain ASCII doesn't pay for it.
+    t.feed(b"\x1b[2J\x1b[Hplain");
+    assert!(t.snapshot(false).unwrap().rows[0].runs[0].cells.is_none());
+}
