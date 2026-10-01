@@ -120,6 +120,10 @@ pub struct Snapshot {
     /// Explicit cursor colour set by the program or [`Terminal::set_colors`].
     pub cursor_color: Option<Rgb>,
     pub scrollbar: Scrollbar,
+    /// The program asked for mouse reports (clicks should go to it, not to selection).
+    pub mouse_tracking: bool,
+    /// The program is using the alternate screen (a full-screen TUI).
+    pub alt_screen: bool,
     pub rows: Vec<Row>,
 }
 
@@ -407,6 +411,8 @@ impl Terminal {
                 cursor,
                 cursor_color: colors.cursor_has_value.then(|| colors.cursor.into()),
                 scrollbar: self.scrollbar(),
+                mouse_tracking: self.mouse_tracking(),
+                alt_screen: self.alt_screen(),
                 rows,
             })
         }

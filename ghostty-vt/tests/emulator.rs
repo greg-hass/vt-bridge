@@ -214,3 +214,20 @@ fn non_ascii_runs_carry_per_column_cells() {
     t.feed(b"\x1b[2J\x1b[Hplain");
     assert!(t.snapshot(false).unwrap().rows[0].runs[0].cells.is_none());
 }
+
+#[cfg(feature = "serde")]
+#[test]
+fn events_and_snapshots_serialise_for_the_webview() {
+    let mut t = Terminal::new(10, 2).unwrap();
+    t.feed(b"\x1b]133;D;3\x07\x1b[?1000hhi");
+    let ev = t.take_events();
+    let json = serde_json::to_value(&ev).unwrap();
+    assert!(json.to_string().contains(r#""type":"prompt""#), "{json}");
+    assert!(json.to_string().contains(r#""step":"command_end""#), "{json}");
+    assert!(json.to_string().contains(r#""exit_code":3"#), "{json}");
+    let snap = serde_json::to_value(t.snapshot(false).unwrap()).unwrap();
+    assert_eq!(snap["mouse_tracking"], true);
+    assert_eq!(snap["rows"][0]["runs"][0]["text"], "hi");
+    assert_eq!(snap["fg"].as_array().unwrap().len(), 3);
+    assert_eq!(snap["cursor"]["style"], "block");
+}
