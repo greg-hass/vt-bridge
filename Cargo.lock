@@ -115,6 +115,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ghostty-vt-session"
+version = "0.1.0"
+dependencies = [
+ "ghostty-vt",
+ "portable-pty",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ghostty-vt-sys"
 version = "0.1.0"
 dependencies = [
@@ -477,6 +487,15 @@ name = "unicode-ident"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
+
+[[package]]
+name = "vt-host"
+version = "0.1.0"
+dependencies = [
+ "ghostty-vt-session",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "winapi"

@@ -1,0 +1,13 @@
+[package]
+name = "ghostty-vt-session"
+version = "0.1.0"
+edition = "2021"
+description = "A PTY + libghostty-vt terminal session: threads, frame coalescing, input encoding"
+
+[dependencies]
+ghostty-vt = { path = "../ghostty-vt", features = ["serde"] }
+portable-pty = "0.8"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

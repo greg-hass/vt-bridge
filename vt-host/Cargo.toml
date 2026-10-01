@@ -1,0 +1,13 @@
+[package]
+name = "vt-host"
+version = "0.1.0"
+edition = "2021"
+description = "Runs a program in a PTY through libghostty-vt and speaks JSON lines on stdin/stdout, for UIs that can't link Rust (QML)"
+
+[dev-dependencies]
+serde_json = "1"
+
+[dependencies]
+ghostty-vt-session = { path = "../ghostty-vt-session" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
