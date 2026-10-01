@@ -231,3 +231,32 @@ fn events_and_snapshots_serialise_for_the_webview() {
     assert_eq!(snap["fg"].as_array().unwrap().len(), 3);
     assert_eq!(snap["cursor"]["style"], "block");
 }
+
+#[test]
+fn ctrl_and_alt_survive_the_kitty_protocol_even_when_text_is_supplied() {
+    // Regression: with Kitty flags on, Ctrl+A arrived as a plain "a" because the letter's text
+    // was passed along. Seen live in nvim, which enables the protocol.
+    let mut t = Terminal::new(10, 3).unwrap();
+    let ctrl = Mods { ctrl: true, ..Mods::default() };
+    let alt = Mods { alt: true, ..Mods::default() };
+    t.feed(b"\x1b[>1u");
+    assert_eq!(t.encode_key("KeyA", Some("a"), ctrl, KeyAction::Press), b"\x1b[97;5u");
+    assert_eq!(t.encode_key("KeyA", None, ctrl, KeyAction::Press), b"\x1b[97;5u");
+    assert_eq!(t.encode_key("KeyX", Some("x"), alt, KeyAction::Press), b"\x1b[120;3u");
+    // Plain typing is still just text.
+    assert_eq!(t.encode_key("KeyA", Some("a"), Mods::default(), KeyAction::Press), b"a");
+    assert_eq!(t.encode_key("KeyA", Some("A"), Mods { shift: true, ..Mods::default() }, KeyAction::Press), b"A");
+}
+
+#[test]
+fn ctrl_and_alt_letters_in_legacy_mode_with_and_without_text() {
+    let mut t = Terminal::new(10, 3).unwrap();
+    let ctrl = Mods { ctrl: true, ..Mods::default() };
+    let alt = Mods { alt: true, ..Mods::default() };
+    for text in [Some("a"), None] {
+        assert_eq!(t.encode_key("KeyA", text, ctrl, KeyAction::Press), b"\x01");
+        assert_eq!(t.encode_key("KeyD", text, ctrl, KeyAction::Press), b"\x04");
+        assert_eq!(t.encode_key("KeyX", text, alt, KeyAction::Press), b"\x1bx");
+    }
+    assert_eq!(t.encode_key("ArrowUp", None, ctrl, KeyAction::Press), b"\x1b[1;5A");
+}

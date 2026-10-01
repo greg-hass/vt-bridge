@@ -550,12 +550,19 @@ impl Terminal {
             );
             sys::ghostty_key_event_set_key(self.key_event, key);
             sys::ghostty_key_event_set_mods(self.key_event, mods.bits());
+            // Text is what typing the key produced. With Ctrl/Alt/Super held it isn't typing but a
+            // shortcut, and handing the encoder the bare letter makes the Kitty protocol report a
+            // plain "a" for Ctrl+A. So withhold it and let key + modifiers speak.
+            let shortcut = mods.ctrl || mods.alt || mods.super_;
+            let text = if shortcut { None } else { text.filter(|t| !t.is_empty()) };
             // Shift is already reflected in `text`, so it isn't a consumed modifier to the encoder.
             sys::ghostty_key_event_set_consumed_mods(self.key_event, if text.is_some() { mods.bits() & sys::GHOSTTY_MODS_SHIFT as u16 } else { 0 });
             match text {
                 Some(t) => sys::ghostty_key_event_set_utf8(self.key_event, t.as_ptr() as *const _, t.len()),
                 None => sys::ghostty_key_event_set_utf8(self.key_event, ptr::null(), 0),
             }
+            // The protocol identifies a key by its unshifted codepoint.
+            sys::ghostty_key_event_set_unshifted_codepoint(self.key_event, unshifted_codepoint(code).map_or(0, |c| c as u32));
             let mut buf = [0u8; 128];
             let mut n = 0usize;
             let r = sys::ghostty_key_encoder_encode(self.encoder, self.key_event, buf.as_mut_ptr() as *mut _, buf.len(), &mut n);
@@ -713,6 +720,36 @@ pub struct MouseEvent {
     pub x: f32,
     pub y: f32,
     pub any_button_pressed: bool,
+}
+
+/// The character a physical key produces with no modifiers, on a US layout, from its W3C code.
+/// Only used to name the key to programs using the Kitty protocol, never to produce text.
+fn unshifted_codepoint(code: &str) -> Option<char> {
+    if let Some(l) = code.strip_prefix("Key") {
+        let mut c = l.chars();
+        return match (c.next(), c.next()) {
+            (Some(ch), None) if ch.is_ascii_uppercase() => Some(ch.to_ascii_lowercase()),
+            _ => None,
+        };
+    }
+    if let Some(d) = code.strip_prefix("Digit") {
+        return d.chars().next().filter(char::is_ascii_digit);
+    }
+    Some(match code {
+        "Space" => ' ',
+        "Minus" => '-',
+        "Equal" => '=',
+        "BracketLeft" => '[',
+        "BracketRight" => ']',
+        "Backslash" => '\\',
+        "Semicolon" => ';',
+        "Quote" => '\'',
+        "Comma" => ',',
+        "Period" => '.',
+        "Slash" => '/',
+        "Backquote" => '`',
+        _ => return None,
+    })
 }
 
 impl Drop for Terminal {
