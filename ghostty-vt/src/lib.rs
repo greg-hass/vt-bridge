@@ -441,10 +441,11 @@ impl Terminal {
             );
             let mut wide: i32 = 0;
             sys::ghostty_cell_get(raw, sys::GhosttyCellData::GHOSTTY_CELL_DATA_WIDE, &mut wide as *mut _ as *mut c_void);
-            if wide == sys::GhosttyCellWide::GHOSTTY_CELL_WIDE_SPACER_TAIL || wide == sys::GhosttyCellWide::GHOSTTY_CELL_WIDE_SPACER_HEAD {
+            // bindgen's enum constants are u32 or i32 depending on the clang version; compare as i64.
+            if wide as i64 == sys::GhosttyCellWide::GHOSTTY_CELL_WIDE_SPACER_TAIL as i64 || wide as i64 == sys::GhosttyCellWide::GHOSTTY_CELL_WIDE_SPACER_HEAD as i64 {
                 continue;
             }
-            let width: u16 = if wide == sys::GhosttyCellWide::GHOSTTY_CELL_WIDE_WIDE { 2 } else { 1 };
+            let width: u16 = if wide as i64 == sys::GhosttyCellWide::GHOSTTY_CELL_WIDE_WIDE as i64 { 2 } else { 1 };
 
             let mut len: u32 = 0;
             sys::ghostty_render_state_row_cells_get(
@@ -548,7 +549,7 @@ impl Terminal {
                     KeyAction::Repeat => sys::GhosttyKeyAction::GHOSTTY_KEY_ACTION_REPEAT,
                 },
             );
-            sys::ghostty_key_event_set_key(self.key_event, key);
+            sys::ghostty_key_event_set_key(self.key_event, key as _);
             sys::ghostty_key_event_set_mods(self.key_event, mods.bits());
             // Text is what typing the key produced. With Ctrl/Alt/Super held it isn't typing but a
             // shortcut, and handing the encoder the bare letter makes the Kitty protocol report a
